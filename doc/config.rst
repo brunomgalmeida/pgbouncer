@@ -109,13 +109,13 @@ How to authenticate users.
 pam
     PAM is used to authenticate users, `auth_file`_ is ignored. This method is not
     compatible with databases using `auth_user`_ option. Service name reported to
-    PAM is "pgbouncer". Also, `pam` is still not supported in HBA configuration file.
+    PAM is "pgbouncer".
 
 hba
     Actual auth type is loaded from `auth_hba_file`_.  This allows different
     authentication methods different access paths.  Example: connection
     over Unix socket use ``peer`` auth method, connection over TCP
-    must use TLS. Supported from version 1.7 onwards.
+    must use TLS. Supported from version 1.7 onwards. 
 
 cert
     Client must connect over TLS connection with valid client cert.
@@ -1017,8 +1017,8 @@ There are following differences:
 * Database field: Supports `all`, `sameuser`, `@file`, multiple names.  Not supported: `replication`, `samerole`, `samegroup`.
 * Username field: Supports `all`, `@file`, multiple names.  Not supported: `+groupname`.
 * Address field: Supported IPv4, IPv6.  Not supported: DNS names, domain prefixes.
-* Auth-method field:  Supported methods: `trust`, `reject`, `md5`, `password`, `peer`, `cert`.
-  Not supported: `gss`, `sspi`, `ident`, `ldap`, `radius`, `pam`.
+* Auth-method field:  Supported methods: `trust`, `reject`, `md5`, `password`, `peer`, `cert`, `pam`.
+  Not supported: `gss`, `sspi`, `ident`, `ldap`, `radius`.
   Also username map (`map=`) parameter is not supported.
 
 Example
