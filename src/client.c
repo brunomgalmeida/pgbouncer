@@ -266,7 +266,8 @@ bool set_pool(PgSocket *client, const char *dbname, const char *username, const 
 			return false;
 		}
 		client->auth_user = client->db->forced_user;
-	} else if (cf_auth_type == AUTH_PAM) {
+
+	} else if (cf_auth_type == AUTH_PAM || cf_auth_type == AUTH_HBA) {
 		if (client->db->auth_user) {
 			slog_error(client, "PAM can't be used together with database authorization");
 			disconnect_client(client, true, "bouncer config error");

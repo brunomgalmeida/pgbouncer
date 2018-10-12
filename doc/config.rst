@@ -116,6 +116,7 @@ hba
     authentication methods different access paths.  Example: connection
     over Unix socket use ``peer`` auth method, connection over TCP
     must use TLS. Supported from version 1.7 onwards. 
+    Does not require `auth_file`_.
 
 cert
     Client must connect over TLS connection with valid client cert.
