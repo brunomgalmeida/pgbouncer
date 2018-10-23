@@ -591,12 +591,13 @@ bool check_fast_fail(PgSocket *client)
 {
 	int cnt;
 	PgPool *pool = client->pool;
+	usec_t now = get_cached_time();
 
 	/* reject if no servers and last connect failed */
 	if (!pool->last_connect_failed)
 		return true;
 	cnt = pool_server_count(pool) - statlist_count(&pool->new_server_list);
-	if (cnt)
+	if (now - pool->last_connect_time > cf_server_login_retry)
 		return true;
 	disconnect_client(client, true, "pgbouncer cannot connect to server");
 
