@@ -598,7 +598,7 @@ bool check_fast_fail(PgSocket *client)
 	if (!pool->last_connect_failed)
 		return true;
 	cnt = pool_server_count(pool) - statlist_count(&pool->new_server_list);
-	if (now - pool->last_connect_time > cf_server_login_retry)
+	if (cf_auth_type == AUTH_PAM && now - pool->last_connect_time > cf_server_login_retry)
 		return true;
 	disconnect_client(client, true, "pgbouncer cannot connect to server");
 
