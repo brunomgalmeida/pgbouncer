@@ -425,7 +425,10 @@ PgUser *add_pam_user(const char *name, const char *passwd)
 	PgUser *user = NULL;
 	struct AANode *node;
 
-	node = aatree_search(&pam_user_tree, (uintptr_t)name);
+	char *tmpname=calloc(1,MAX_USERNAME);
+	strncpy(tmpname,name,MAX_USERNAME);
+	tmpname[MAX_USERNAME-1]='\0';
+	node = aatree_search(&pam_user_tree, (uintptr_t)tmpname);
 	user = node ? container_of(node, PgUser, tree_node) : NULL;
 
 	if (user == NULL) {
@@ -435,12 +438,13 @@ PgUser *add_pam_user(const char *name, const char *passwd)
 
 		list_init(&user->head);
 		list_init(&user->pool_list);
-		safe_strcpy(user->name, name, sizeof(user->name));
+		safe_strcpy(user->name, tmpname, sizeof(user->name));
 
 		aatree_insert(&pam_user_tree, (uintptr_t)user->name, &user->tree_node);
 		user->pool_mode = POOL_INHERIT;
 	}
-	safe_strcpy(user->passwd, passwd, sizeof(user->passwd));
+	if(strcmp(passwd,"") != 0)
+		safe_strcpy(user->passwd, passwd, sizeof(user->passwd));
 	return user;
 }
 
@@ -590,12 +594,15 @@ bool check_fast_fail(PgSocket *client)
 {
 	int cnt;
 	PgPool *pool = client->pool;
+	usec_t now = get_cached_time();
 
 	/* reject if no servers are available and the last login failed */
 	if (!pool->last_login_failed)
 		return true;
 	cnt = pool_server_count(pool) - statlist_count(&pool->new_server_list);
 	if (cnt)
+		return true;
+	if (cf_auth_type == AUTH_PAM && now - pool->last_connect_time > cf_server_login_retry)
 		return true;
 	disconnect_client(client, true, "pgbouncer cannot connect to server");
 
