@@ -186,9 +186,8 @@ void change_client_state(PgSocket *client, SocketState newstate)
 		statlist_append(&login_client_list, &client->head);
 		break;
 	case CL_WAITING:
-		client->wait_start = get_cached_time();
-		/* fallthrough */
 	case CL_WAITING_LOGIN:
+		client->wait_start = get_cached_time();
 		statlist_append(&pool->waiting_client_list, &client->head);
 		break;
 	case CL_ACTIVE:
@@ -592,8 +591,8 @@ bool check_fast_fail(PgSocket *client)
 	int cnt;
 	PgPool *pool = client->pool;
 
-	/* reject if no servers and last connect failed */
-	if (!pool->last_connect_failed)
+	/* reject if no servers are available and the last login failed */
+	if (!pool->last_login_failed)
 		return true;
 	cnt = pool_server_count(pool) - statlist_count(&pool->new_server_list);
 	if (cnt)
@@ -760,6 +759,7 @@ bool release_server(PgSocket *server)
 	case SV_TESTED:
 		break;
 	case SV_LOGIN:
+		pool->last_login_failed = 0;
 		pool->last_connect_failed = 0;
 		break;
 	default:
@@ -810,7 +810,7 @@ void disconnect_server(PgSocket *server, bool notify, const char *reason, ...)
 	reason = buf;
 
 	if (cf_log_disconnections)
-		slog_info(server, "closing because: %s (age=%" PRIu64 ")", reason,
+		slog_info(server, "closing because: %s (age=%" PRIu64 "s)", reason,
 			  (now - server->connect_time) / USEC);
 
 	switch (server->state) {
@@ -832,9 +832,20 @@ void disconnect_server(PgSocket *server, bool notify, const char *reason, ...)
 		 * except when sending cancel packet
 		 */
 		if (!server->ready)
+		{
+			pool->last_login_failed = 1;
 			pool->last_connect_failed = 1;
+		}
 		else
+		{
+			/*
+			 * We did manage to connect and used the connection for query
+			 * cancellation, so to the best of our knowledge we can connect to
+			 * the server, reset last_connect_failed accordingly.
+			 */
+			pool->last_connect_failed = 0;
 			send_term = 0;
+		}
 		break;
 	default:
 		fatal("disconnect_server: bad server state (%d)", server->state);
@@ -875,7 +886,7 @@ void disconnect_client(PgSocket *client, bool notify, const char *reason, ...)
 	reason = buf;
 
 	if (cf_log_disconnections)
-		slog_info(client, "closing because: %s (age=%" PRIu64 ")", reason,
+		slog_info(client, "closing because: %s (age=%" PRIu64 "s)", reason,
 			  (now - client->connect_time) / USEC);
 
 	switch (client->state) {
@@ -989,7 +1000,6 @@ static void dns_connect(struct PgSocket *server)
 	int res;
 
 	if (!host || host[0] == '/') {
-		slog_noise(server, "unix socket: %s", sa_un.sun_path);
 		memset(&sa_un, 0, sizeof(sa_un));
 		sa_un.sun_family = AF_UNIX;
 		unix_dir = host ? host : cf_unix_socket_dir;
@@ -1000,6 +1010,7 @@ static void dns_connect(struct PgSocket *server)
 		}
 		snprintf(sa_un.sun_path, sizeof(sa_un.sun_path),
 			 "%s/.s.PGSQL.%d", unix_dir, db->port);
+		slog_noise(server, "unix socket: %s", sa_un.sun_path);
 		sa = (struct sockaddr *)&sa_un;
 		sa_len = sizeof(sa_un);
 		res = 1;

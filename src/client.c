@@ -46,7 +46,11 @@ static bool check_client_passwd(PgSocket *client, const char *passwd)
 
 	switch (auth_type) {
 	case AUTH_PLAIN:
-		return strcmp(user->passwd, passwd) == 0;
+		if (isMD5(user->passwd)) {
+			pg_md5_encrypt(passwd, user->name, strlen(user->name), md5);
+			return strcmp(user->passwd, md5) == 0;
+		} else
+			return strcmp(user->passwd, passwd) == 0;
 	case AUTH_MD5:
 		if (strlen(passwd) != MD5_PASSWD_LEN)
 			return false;
@@ -257,6 +261,21 @@ bool set_pool(PgSocket *client, const char *dbname, const char *username, const 
 			return finish_set_pool(client, takeover);
 	}
 
+	/* avoid dealing with invalid data below, and give an
+	 * appropriate error message */
+	if (strlen(username) >= MAX_USERNAME) {
+		disconnect_client(client, true, "username too long");
+		if (cf_log_connections)
+			slog_info(client, "login failed: db=%s user=%s", dbname, username);
+		return false;
+	}
+	if (strlen(password) >= MAX_PASSWORD) {
+		disconnect_client(client, true, "password too long");
+		if (cf_log_connections)
+			slog_info(client, "login failed: db=%s user=%s", dbname, username);
+		return false;
+	}
+
 	/* find user */
 	if (cf_auth_type == AUTH_ANY) {
 		/* ignore requested user */
@@ -374,6 +393,8 @@ bool handle_auth_response(PgSocket *client, PktHdr *pkt) {
 	case '1':	/* ParseComplete */
 		break;
 	case '2':	/* BindComplete */
+		break;
+	case 'S': /* ParameterStatus */
 		break;
 	case 'Z':	/* ReadyForQuery */
 		sbuf_prepare_skip(&client->link->sbuf, pkt->len);
@@ -738,7 +759,7 @@ bool client_proto(SBuf *sbuf, SBufEvent evtype, struct MBuf *data)
 					  hdr2hex(data, hex, sizeof(hex)));
 			return false;
 		}
-		slog_noise(client, "pkt='%c' len=%d", pkt_desc(&pkt), pkt.len);
+		slog_noise(client, "read pkt='%c' len=%d", pkt_desc(&pkt), pkt.len);
 
 		client->request_time = get_cached_time();
 		switch (client->state) {

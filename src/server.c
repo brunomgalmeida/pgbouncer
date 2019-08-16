@@ -243,7 +243,7 @@ static bool handle_server_work(PgSocket *server, PktHdr *pkt)
 		if (state == 'I')
 			ready = true;
 		else if (pool_pool_mode(server->pool) == POOL_STMT) {
-			disconnect_server(server, true, "long transactions not allowed");
+			disconnect_server(server, true, "transaction blocks not allowed in statement pooling mode");
 			return false;
 		} else if (state == 'T' || state == 'E') {
 			idle_tx = true;
@@ -493,7 +493,7 @@ bool server_proto(SBuf *sbuf, SBufEvent evtype, struct MBuf *data)
 			disconnect_server(server, true, "bad pkt header");
 			break;
 		}
-		slog_noise(server, "S: pkt '%c', len=%d", pkt_desc(&pkt), pkt.len);
+		slog_noise(server, "read pkt='%c', len=%d", pkt_desc(&pkt), pkt.len);
 
 		server->request_time = get_cached_time();
 		switch (server->state) {

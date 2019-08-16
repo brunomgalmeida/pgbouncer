@@ -17,7 +17,7 @@
  */
 
 /*
- * Config and pg_auth file reading.
+ * Config and auth file reading.
  */
 
 #include "bouncer.h"
@@ -546,7 +546,7 @@ static void disable_users(void)
 	}
 }
 
-/* load list of users from pg_auth/pg_psw file */
+/* load list of users from auth_file */
 bool load_auth_file(const char *fn)
 {
 	char *user, *password, *buf, *p;
@@ -589,7 +589,7 @@ bool load_auth_file(const char *fn)
 			break;
 		}
 		if (p - user >= MAX_USERNAME) {
-			log_error("username too long");
+			log_error("username too long in auth file");
 			break;
 		}
 		*p++ = 0; /* tag username end */
@@ -607,7 +607,7 @@ bool load_auth_file(const char *fn)
 			break;
 		}
 		if (p - password >= MAX_PASSWORD) {
-			log_error("too long password");
+			log_error("password too long in auth file");
 			break;
 		}
 		*p++ = 0; /* tag password end */
